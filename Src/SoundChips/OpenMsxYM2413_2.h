@@ -67,36 +67,36 @@ public:
 #endif
 
 // Size of Sintable ( 8 -- 18 can be used, but 9 recommended.)
-static const int PG_BITS = 9;
+static const int PG_BITS = /*9*/18/*from OpenMsxYM2413.h*/;
 static const int PG_WIDTH = 1 << PG_BITS;
 
 // Phase increment counter
-static const int DP_BITS = 18;
+static const int DP_BITS = /*18*/20;
 static const int DP_WIDTH = 1 << DP_BITS;
 static const int DP_BASE_BITS = DP_BITS - PG_BITS;
 
 // Dynamic range (Accuracy of sin table)
-static const int DB_BITS = 8;
+static const int DB_BITS = /*8*/18;
 static const DoubleT DB_STEP = 48.0 / (1 << DB_BITS);
 static const int DB_MUTE = 1 << DB_BITS;
 
 // Dynamic range of envelope
-static const DoubleT EG_STEP = 0.375;
-static const int EG_BITS = 7;
+static const int EG_BITS = /*7*/18;
+static const DoubleT EG_STEP = 48.0 / (1 << EG_BITS);
 static const int EG_MUTE = 1 << EG_BITS;
 
 // Dynamic range of total level
-static const DoubleT TL_STEP = 0.75;
 static const int TL_BITS = 6;
+static const DoubleT TL_STEP = 48.0 / (1 << TL_BITS);
 static const int TL_MUTE = 1 << TL_BITS;
 
 // Dynamic range of sustine level
-static const DoubleT SL_STEP = 3.0;
 static const int SL_BITS = 4;
+static const DoubleT SL_STEP = 48.0 / (1 << SL_BITS);
 static const int SL_MUTE = 1 << SL_BITS;
 
 // Bits for liner value
-static const int DB2LIN_AMP_BITS = 8;
+static const int DB2LIN_AMP_BITS = /*8*/15;
 static const int SLOT_AMP_BITS = DB2LIN_AMP_BITS;
 
 // Bits for envelope phase incremental counter
@@ -104,17 +104,17 @@ static const int EG_DP_BITS = 22;
 static const int EG_DP_WIDTH = 1 << EG_DP_BITS;
 
 // Bits for Pitch and Amp modulator 
-static const int PM_PG_BITS = 8;
+static const int PM_PG_BITS = /*8*/18;
 static const int PM_PG_WIDTH = 1 << PM_PG_BITS;
-static const int PM_DP_BITS = 16;
+static const int PM_DP_BITS = /*16*/20;
 static const int PM_DP_WIDTH = 1 << PM_DP_BITS;
-static const int AM_PG_BITS = 8;
+static const int AM_PG_BITS = /*8*/18;
 static const int AM_PG_WIDTH = 1 << AM_PG_BITS;
-static const int AM_DP_BITS = 16;
+static const int AM_DP_BITS = /*16*/20;
 static const int AM_DP_WIDTH = 1 << AM_DP_BITS;
 
 // PM table is calcurated by PM_AMP * pow(2,PM_DEPTH*sin(x)/1200) 
-static const int PM_AMP_BITS = 8;
+static const int PM_AMP_BITS = /*8*/15;
 static const int PM_AMP = 1 << PM_AMP_BITS;
 
 // PM speed(Hz) and depth(cent) 
@@ -173,8 +173,8 @@ class OpenYM2413_2 : public OpenYM2413Base
 		inline void updateWF();
 		inline void updateEG();
 		inline void updateAll();
-		inline static int wave2_4pi(int e);
-		inline static int wave2_8pi(int e);
+		inline static /*int*/long long wave2_4pi(int e);
+		inline static /*int*/long long wave2_8pi(int e);
 		inline static int EG2DB(int d);
 		inline static int SL2EG(int d);
 	
@@ -188,7 +188,7 @@ class OpenYM2413_2 : public OpenYM2413Base
 		int output[5];	// Output value of slot 
 
 		// for Phase Generator (PG)
-		word* sintbl;		// Wavetable
+		/*word*/unsigned int* sintbl;		// Wavetable
         int sintblIdx;
 		unsigned int phase;	// Phase 
 		unsigned int dphase;	// Phase increment amount 
@@ -286,7 +286,11 @@ private:
 	virtual byte read(unsigned address);
 	virtual void write(unsigned address, byte value);
 
+#if 0
     int filter(int input);
+#else
+	double filter(double input);
+#endif
 private:
 	int maxVolume;
 
@@ -318,12 +322,12 @@ private:
 	static short dB2LinTab[(DB_MUTE + DB_MUTE) * 2];
 
 	// WaveTable for each envelope amp
-	static word fullsintable[PG_WIDTH];
-	static word halfsintable[PG_WIDTH];
+	static /*word*/unsigned int fullsintable[PG_WIDTH];
+	static /*word*/unsigned int halfsintable[PG_WIDTH];
 
 	static unsigned int dphaseNoiseTable[512][8];
 
-	static word* waveform[2];
+	static unsigned int* waveform[2];
 
 	// LFO Table
 	static int pmtable[PM_PG_WIDTH];
@@ -334,7 +338,7 @@ private:
 	static unsigned int am_dphase;
 
 	// Liner to Log curve conversion table (for Attack rate).
-	static word AR_ADJUST_TABLE[1 << EG_BITS];
+	static /*word*/unsigned int AR_ADJUST_TABLE[1 << EG_BITS];
 
 	// Definition of envelope mode
 	enum { READY, ATTACK, DECAY, SUSHOLD, SUSTINE, RELEASE, SETTLE, FINISH };
@@ -354,6 +358,9 @@ private:
 	const std::string name;
 
     int buffer[AUDIO_MONO_BUFFER_SIZE];
+	
+	// ADD by toor-t 2017/06/07
+	int oplOversampling;
 };
 
 #endif

@@ -239,10 +239,10 @@ AY8910* ay8910Create(Mixer* mixer, Ay8910Connector connector, PsgType type, Int3
         }
     }
 
-    for (i = 0; i < 16; i++) {
+    for (i = 15; i >= 0; i--) {	/* MOD by toor-t 2017/06/03 間違ってるような気がしたので */
         voltTable[i] -= voltTable[0];
     }
-    for (i = 0; i < 32; i++) {
+    for (i = 31; i >= 0; i--) {	/* MOD by toor-t 2017/06/03 間違ってるような気がしたので */
         voltEnvTable[i] -= voltEnvTable[0];
     }
 
@@ -397,7 +397,7 @@ static void updateRegister(AY8910* ay8910, UInt8 regIndex, UInt8 data)
         
     case 6:
         period = data ? data : 1;
-        ay8910->noiseStep = period > 0 ? BASE_PHASE_STEP / period : 1 << 31;
+        ay8910->noiseStep = period > 0 ? BASE_PHASE_STEP /*MOD by toor-t 2017/06/03 PSGホワイトノイズチューニングのため */ /*/ 2*/ /*End MOD*/ / period : 1 << 31;
         break;
         
     case 7:

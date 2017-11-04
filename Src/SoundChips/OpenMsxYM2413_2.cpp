@@ -27,10 +27,10 @@ int OpenYM2413_2::pmtable[PM_PG_WIDTH];
 int OpenYM2413_2::amtable[AM_PG_WIDTH];
 unsigned int OpenYM2413_2::tllTable[16][8][1 << TL_BITS][4];
 int OpenYM2413_2::rksTable[2][8][2];
-word OpenYM2413_2::AR_ADJUST_TABLE[1 << EG_BITS];
-word OpenYM2413_2::fullsintable[PG_WIDTH];
-word OpenYM2413_2::halfsintable[PG_WIDTH];
-word* OpenYM2413_2::waveform[2] = {fullsintable, halfsintable};
+/*word*/unsigned int OpenYM2413_2::AR_ADJUST_TABLE[1 << EG_BITS];
+/*word*/unsigned int OpenYM2413_2::fullsintable[PG_WIDTH];
+/*word*/unsigned int OpenYM2413_2::halfsintable[PG_WIDTH];
+/*word*/unsigned int* OpenYM2413_2::waveform[2] = {fullsintable, halfsintable};
 short OpenYM2413_2::dB2LinTab[(2 * DB_MUTE) * 2];
 unsigned int OpenYM2413_2::dphaseARTable[16][16];
 unsigned int OpenYM2413_2::dphaseDRTable[16][16];
@@ -47,24 +47,24 @@ unsigned int OpenYM2413_2::am_dphase;
 
 int OpenYM2413_2::Slot::EG2DB(int d) 
 {
-	return d * (int)(EG_STEP / DB_STEP);
+	return (int)round(d * (EG_STEP / DB_STEP));
 }
 int OpenYM2413_2::TL2EG(int d)
 { 
-	return d * (int)(TL_STEP / EG_STEP);
+	return (int)round(d * (TL_STEP / EG_STEP));
 }
 int OpenYM2413_2::Slot::SL2EG(int d)
 {
-	return d * (int)(SL_STEP / EG_STEP);
+	return (int)round(d * (SL_STEP / EG_STEP));
 }
 
 unsigned int OpenYM2413_2::DB_POS(DoubleT x)
 {
-	return (unsigned int)(x / DB_STEP);
+	return (unsigned int)round((x / DB_STEP));
 }
 unsigned int OpenYM2413_2::DB_NEG(DoubleT x)
 {
-	return (unsigned int)(2 * DB_MUTE + x / DB_STEP);
+	return (unsigned int)round(2 * DB_MUTE + x / DB_STEP);
 }
 
 // Cut the lower b bit off
@@ -103,9 +103,13 @@ void OpenYM2413_2::makeAdjustTable()
 {
 	AR_ADJUST_TABLE[0] = (1 << EG_BITS) - 1;
 	for (int i = 1; i < (1 << EG_BITS); ++i) {
-		AR_ADJUST_TABLE[i] = (unsigned short)((DoubleT)(1 << EG_BITS) - 1 -
-		                     ((1 << EG_BITS) - 1) * ::log((DoubleT)i) / ::log(127.0));
+		AR_ADJUST_TABLE[i] = (unsigned /*short*/)round(((DoubleT)(1 << EG_BITS) - 1 - ((1 << EG_BITS) - 1) * ::log((DoubleT)i) / ::log(/*127.0*/(1 << EG_BITS) - 1)));
 	}
+    /*DEBUG*/
+//    fprintf(stderr, "\nAR_ADJUST_TABLE=\n");
+//    for (int i = 0; i < (1 << EG_BITS); ++i) {
+//        fprintf(stderr, "%d=%d ", i, AR_ADJUST_TABLE[i]);
+//    }
 }
 
 // Table for dB(0 .. (1<<DB_BITS)-1) to lin(0 .. DB2LIN_AMP_WIDTH)
@@ -113,11 +117,16 @@ void OpenYM2413_2::makeDB2LinTable()
 {
 	for (int i = 0; i < 2 * DB_MUTE; ++i) {
 		dB2LinTab[i] = (i < DB_MUTE)
-		             ?  (short)((DoubleT)((1 << DB2LIN_AMP_BITS) - 1) *
-		                    pow(10.0, -(DoubleT)i * DB_STEP / 20))
+		             ?  (short)round(((DoubleT)((1 << DB2LIN_AMP_BITS) - 1) *
+		                    pow(10.0, -(DoubleT)i * DB_STEP / 20.0)))
 		             : 0;
 		dB2LinTab[i + 2 * DB_MUTE] = -dB2LinTab[i];
 	}
+    /*DEBUG*/
+//    fprintf(stderr,"\ndB2LinTab=\n");
+//    for(int i = 0; i < 4 * DB_MUTE; i++) {
+//        fprintf(stderr, "%d ", dB2LinTab[i]);
+//    }
 }
 
 // lin(+0.0 .. +1.0) to  dB((1<<DB_BITS)-1 .. 0)
@@ -125,16 +134,27 @@ int OpenYM2413_2::lin2db(DoubleT d)
 {
 	return (d == 0)
 		? DB_MUTE - 1
-		: std::min(-(int)(20.0 * log10(d) / DB_STEP), DB_MUTE - 1); // 0 - 127
+		: std::min((int)round(-(20.0 * log10(d) / DB_STEP)), DB_MUTE - 1); // 0 - 127
 }
 
 // Sin Table
 void OpenYM2413_2::makeSinTable()
 {
-	for (int i = 0; i < PG_WIDTH / 4; ++i)
+#if 0
+    for (int i = 0; i < PG_WIDTH / 4; ++i)
 		fullsintable[i] = lin2db(sin(2.0 * PI * i / PG_WIDTH));
 	for (int i = 0; i < PG_WIDTH / 4; ++i)
 		fullsintable[PG_WIDTH / 2 - 1 - i] = fullsintable[i];
+#else
+    for (int i = 0; i < PG_WIDTH / 2; ++i)
+        fullsintable[i] = lin2db(sin(((i * 2) + 1) * PI / PG_WIDTH));
+//    /*JIKKEN*/
+//    fullsintable[0] = lin2db(0.03);
+//    fullsintable[1] = lin2db(0.02);
+//    fullsintable[2] = lin2db(0.01);
+//    fullsintable[3] = lin2db(0.02);
+    
+#endif
 	for (int i = 0; i < PG_WIDTH / 2; ++i)
 		fullsintable[PG_WIDTH / 2 + i] = 2 * DB_MUTE + fullsintable[i];
 
@@ -142,6 +162,16 @@ void OpenYM2413_2::makeSinTable()
 		halfsintable[i] = fullsintable[i];
 	for (int i = PG_WIDTH / 2; i < PG_WIDTH; ++i)
 		halfsintable[i] = fullsintable[0];
+    
+    /*DEBUG*/
+//    fprintf(stderr,"\nfullsintable=\n");
+//    for(int i = 0; i < PG_WIDTH; i++) {
+//        fprintf(stderr, "%d ", fullsintable[i]);
+//    }
+//    fprintf(stderr,"\nhalfsintable=\n");
+//    for(int i = 0; i < PG_WIDTH; i++) {
+//        fprintf(stderr, "%d ", halfsintable[i]);
+//    }
 }
 
 static inline DoubleT saw(DoubleT phase)
@@ -159,9 +189,9 @@ static inline DoubleT saw(DoubleT phase)
 void OpenYM2413_2::makePmTable()
 {
 	for (int i = 0; i < PM_PG_WIDTH; ++i) {
-		 pmtable[i] = (int)((DoubleT)PM_AMP * 
+		 pmtable[i] = (int)round(((DoubleT)PM_AMP *
 		     pow(2.0, (DoubleT)PM_DEPTH * 
-		            saw(2.0 * PI * i / PM_PG_WIDTH) / 1200));
+		            saw(2.0 * PI * i / PM_PG_WIDTH) / 1200)));
 	}
 }
 
@@ -169,8 +199,8 @@ void OpenYM2413_2::makePmTable()
 void OpenYM2413_2::makeAmTable()
 {
 	for (int i = 0; i < AM_PG_WIDTH; ++i) {
-		amtable[i] = (int)((DoubleT)AM_DEPTH / 2 / DB_STEP *
-		                   (1.0 + saw(2.0 * PI * i / PM_PG_WIDTH)));
+		amtable[i] = (int)round(((DoubleT)AM_DEPTH / 2 / DB_STEP *
+		                   (1.0 + saw(2.0 * PI * i / PM_PG_WIDTH))));
 	}
 }
 
@@ -210,11 +240,11 @@ void OpenYM2413_2::makeTllTable()
 					if (KL == 0) {
 						tllTable[fnum][block][TL][KL] = TL2EG(TL);
 					} else {
-						int tmp = (int)(kltable[fnum] - (3.000 * 2) * (7 - block));
+						int tmp = (int)round((kltable[fnum] - (3.000 * 2) * (7 - block)));
 						tllTable[fnum][block][TL][KL] =
 						    (tmp <= 0) ?
 						    TL2EG(TL) :
-						    (unsigned int)((tmp >> (3 - KL)) / EG_STEP) + TL2EG(TL);
+						    (unsigned int)round(((tmp >> (3 - KL)) / EG_STEP) + TL2EG(TL));
 					}
 				}
 			}
@@ -517,6 +547,14 @@ void OpenYM2413_2::Channel::setVol(int volume)
 // Set F-Number (fnum : 9bit)
 void OpenYM2413_2::Channel::setFnumber(int fnum)
 {
+    /*JIKKEN*/
+    if ((car.slot_on_flag || mod.slot_on_flag)) {
+        if (fnum < 8 || fnum > 504) {
+            //とりあえず今回は無視
+            fprintf(stderr, "無視:fNum=%d\n", fnum);
+            return;
+        }
+    }
 	car.fnum = fnum;
 	mod.fnum = fnum;
 }
@@ -635,6 +673,10 @@ void OpenYM2413_2::reset(const EmuTime &time)
 
 void OpenYM2413_2::setSampleRate(int sampleRate, int Oversampling)
 {
+	/* ADD by toor-t 2017/06/07 */
+	oplOversampling = /*Oversampling*/4;
+	sampleRate *= oplOversampling;
+	
 	makeDphaseTable(sampleRate);
 	makeDphaseARTable(sampleRate);
 	makeDphaseDRTable(sampleRate);
@@ -727,7 +769,7 @@ void OpenYM2413_2::update_key_status()
 //******************************************************//
 
 // Convert Amp(0 to EG_HEIGHT) to Phase(0 to 4PI)
-int OpenYM2413_2::Slot::wave2_4pi(int e) 
+/*int*/long long OpenYM2413_2::Slot::wave2_4pi(int e)
 {
 	int shift =  SLOT_AMP_BITS - PG_BITS - 1;
 	if (shift > 0) {
@@ -738,13 +780,13 @@ int OpenYM2413_2::Slot::wave2_4pi(int e)
 }
 
 // Convert Amp(0 to EG_HEIGHT) to Phase(0 to 8PI)
-int OpenYM2413_2::Slot::wave2_8pi(int e) 
+/*int*/long long OpenYM2413_2::Slot::wave2_8pi(int e)
 {
 	int shift = SLOT_AMP_BITS - PG_BITS - 2;
 	if (shift > 0) {
-		return e >> shift;
+		return (long long)e >> shift;
 	} else {
-		return e << -shift;
+		return (long long)e << -shift;
 	}
 }
 
@@ -779,7 +821,7 @@ inline void OpenYM2413_2::update_noise()
 // EG
 void OpenYM2413_2::Slot::calc_envelope(int lfo_am)
 {
-	#define S2E(x) (SL2EG((int)(x / SL_STEP)) << (EG_DP_BITS - EG_BITS)) 
+	#define S2E(x) (SL2EG((int)round(x / SL_STEP)) << (EG_DP_BITS - EG_BITS))
 	static unsigned int SL[16] = {
 		S2E( 0.0), S2E( 3.0), S2E( 6.0), S2E( 9.0),
 		S2E(12.0), S2E(15.0), S2E(18.0), S2E(21.0),
@@ -851,7 +893,7 @@ void OpenYM2413_2::Slot::calc_envelope(int lfo_am)
 		out = DB_MUTE - 1;
 	}
 	
-	egout = out | 3;
+	egout = out /*| 3*/;
 }
 
 // CARRIOR
@@ -863,7 +905,7 @@ int OpenYM2413_2::Slot::calc_slot_car(int fm)
 		output[0] = dB2LinTab[sintbl[(pgout + wave2_8pi(fm)) & (PG_WIDTH - 1)]
 		                       + egout];
 	}
-	output[1] = (output[1] + output[0]) >> 1;
+    output[1] = ((output[1] + output[0]) & 1) ? ((output[1] + output[0]) >> 1) + 1 : ((output[1] + output[0]) >> 1);
 	return output[1];
 }
 
@@ -880,7 +922,7 @@ int OpenYM2413_2::Slot::calc_slot_mod()
 	} else {
 		output[0] = dB2LinTab[sintbl[pgout] + egout];
 	}
-	feedback = (output[1] + output[0]) >> 1;
+	feedback = ((output[1] + output[0]) & 1) ? ((output[1] + output[0]) >> 1) + 1 : ((output[1] + output[0]) >> 1);
 	return feedback;
 }
 
@@ -937,7 +979,7 @@ int OpenYM2413_2::Slot::calc_slot_hat(int pgout_cym, bool noise)
 	return dB2LinTab[dbout + egout];
 }
 
-
+#if 0
 int OpenYM2413_2::filter(int input) {
     in[4] = in[3];
     in[3] = in[2];
@@ -947,6 +989,64 @@ int OpenYM2413_2::filter(int input) {
 
     return (0 * (in[0] + in[4]) + 1 * (in[3] + in[1]) + 2 * in[2]) / 4;
 }
+#else
+
+double OpenYM2413_2::filter(double input) {
+    
+    static int initFlag = 0;
+    static double b0_a0, b1_a0, b2_a0, a1_a0, a2_a0;
+    static double in1 = 0.0f, in2 = 0.0f, out1 = 0.0f, out2 = 0.0f;
+    
+    if (!initFlag) {
+        // それぞれの変数は下記のとおりとする
+        // float samplerate … サンプリング周波数
+        // float freq … カットオフ周波数
+        // float q    … フィルタのQ値
+        double omega = 2.0f * 3.14159265f * /*freq*//*(44100.0 * oplOversampling / 2)*/22050.0  / /*samplerate*/(44100.0 * oplOversampling);
+        double alpha = sin(omega) / (2.0f * /*q*//*0.3*/(1 / sqrt(2)));
+        
+        double a0 =  1.0f + alpha;
+        double a1 = -2.0f * cos(omega);
+        double a2 =  1.0f - alpha;
+        double b0 = (1.0f - cos(omega)) / 2.0f;
+        double b1 =  1.0f - cos(omega);
+        double b2 = (1.0f - cos(omega)) / 2.0f;
+        
+        b0_a0 = b0/a0;
+        b1_a0 = b1/a0;
+        b2_a0 = b2/a0;
+        a1_a0 = a1/a0;
+        a2_a0 = a2/a0;
+        
+        initFlag = 1;
+    }
+    
+    /**/
+    input /= INT_MAX;
+    
+	//float	output = b0/a0 * input + b1 / a0 * in1  + b2 / a0 * in2 - a1 / a0 * out1 - a2/a0 * out2;
+    double	output = b0_a0 * (double)input + b1_a0 * in1  + b2_a0 * in2 - a1_a0 * out1 - a2_a0 * out2;
+ 
+    /*DEBUG*/
+//    if (output > 1.0) {
+//        fprintf(stderr,"overflow");
+//        output = 1.0;
+//    }
+//    if (output < -1.0) {
+//        fprintf(stderr,"underflow");
+//        output = -1.0;
+//    }
+
+    in2  = in1;       // 2つ前の入力信号を更新
+	in1  = input;  // 1つ前の入力信号を更新
+ 
+	out2 = out1;      // 2つ前の出力信号を更新
+	out1 = output; // 1つ前の出力信号を更新
+
+
+	return (double)output * INT_MAX;
+}
+#endif
 
 inline int OpenYM2413_2::calcSample()
 {
@@ -1000,7 +1100,11 @@ inline int OpenYM2413_2::calcSample()
 			mix += cp->car.calc_slot_car(cp->mod.calc_slot_mod());
 		}
 	}
-	return filter((maxVolume * mix) >> (DB2LIN_AMP_BITS - 1)); 
+#if 1
+	return (int)round(filter(((long long)maxVolume * (long long)mix) >> (DB2LIN_AMP_BITS - 1)));
+#else
+	return (int)round(filter(maxVolume * mix)) >> (DB2LIN_AMP_BITS-1);
+#endif
 }
 
 void OpenYM2413_2::checkMute()
@@ -1031,7 +1135,16 @@ int* OpenYM2413_2::updateBuffer(int length)
     int* buf = buffer;
 
 	while (length--) {
+#if 0	// MOD by toor-t 2017/06/07
 		*(buf++) = calcSample();
+#else
+		int output = 0;
+		int count = oplOversampling;
+		while (count--) {
+			output = calcSample();
+		}
+		*(buf++) = (output /*>> (DB2LIN_AMP_BITS - 1)*/);
+#endif	// MOD by toor-t
 	}
 	checkMute();
 
@@ -1053,6 +1166,9 @@ void OpenYM2413_2::setInternalVolume(short newVolume)
 void OpenYM2413_2::writeReg(byte regis, byte data, const EmuTime &time)
 {
 
+    /*DEBUG*/
+//    fprintf(stderr, "writeReg: %x, %x\n",regis, data);
+    
 	assert (regis < 0x40);
 	reg[regis] = data;
 
@@ -1167,6 +1283,9 @@ void OpenYM2413_2::writeReg(byte regis, byte data, const EmuTime &time)
 	{
 		int cha = regis & 0x0F;
 		ch[cha].setFnumber(data + ((reg[0x20 + cha] & 1) << 8));
+        /*DEBUG*/
+//        fprintf(stderr, "writeReg1: cha:%d fNum:%d \n",cha, data + ((reg[0x20 + cha] & 1) << 8));
+        
 		ch[cha].mod.updateAll();
 		ch[cha].car.updateAll();
 		break;
@@ -1186,6 +1305,9 @@ void OpenYM2413_2::writeReg(byte regis, byte data, const EmuTime &time)
 		} else {
 			ch[cha].keyOff();
 		}
+        /*DEBUG*/
+//        fprintf(stderr, "writeReg1: cha:%d fNum:%d block:%d Sustin:%d keyon:%d \n",cha, fNum,block, (data >> 5) & 1, data & 0x10);
+        
 		ch[cha].mod.updateAll();
 		ch[cha].car.updateAll();
 		update_key_status();
@@ -1210,6 +1332,9 @@ void OpenYM2413_2::writeReg(byte regis, byte data, const EmuTime &time)
 		} else { 
 			ch[cha].setPatch(j);
 		}
+        /*DEBUG*/
+//        fprintf(stderr, "writeReg: VOL cahnge!! %d\n", v);
+        
 		ch[cha].setVol(v << 2);
 		ch[cha].mod.updateAll();
 		ch[cha].car.updateAll();
